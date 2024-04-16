@@ -1,5 +1,5 @@
 use std::time::Duration;
-
+use crate::utils::cursor
 use smithay::{
     backend::{
         allocator::dmabuf::Dmabuf,
@@ -343,4 +343,33 @@ pub fn winit_dispatch(
     data.display_handle.flush_clients().unwrap();
     state.popup_manager.cleanup();
     BorderShader::cleanup(winitdata.backend.renderer());
+}
+
+impl dyn Backend {
+    pub fn render(&mut self) {
+        // Load cursor image
+        let theme_name = "desired_theme";
+        let cursor_name = "desired_cursor";
+
+        let theme = cursor::lookup_cursor_theme(theme_name).unwrap_or_else(|| {
+            eprintln!("Failed to find cursor theme '{}', falling back to default", theme_name);
+            cursor::lookup_cursor_theme("default").expect("Failed to find default cursor theme")
+        });
+
+        let image_data = cursor::load_cursor_image(&theme, cursor_name).unwrap_or_else(|| {
+            eprintln!("Failed to load cursor image '{}'", cursor_name);
+            Vec::new() // Fallback: Empty buffer
+        });
+
+        let (width, height, hotspot) = cursor::parse_image_data(&image_data).unwrap_or_else(|| {
+            eprintln!("Failed to parse cursor image data");
+            (0, 0, (0, 0)) // Fallback: Default values
+        });
+
+        // Create texture render element
+        let cursor_texture = TextureRenderElement::new(image_data, width, height, hotspot);
+
+        // Add cursor texture render element to render pipeline
+        self.render_pipeline.add_render_element(cursor_texture);
+    }
 }
